@@ -23,8 +23,8 @@
 #define pino  5 // Vai acabar sendo o D1 de qualquer jeito.
 
 // WIFI
-const char* SSID = "La Casa de Gaiola"; // SSID / nome da rede WI-FI que deseja se conectar
-const char* PASSWORD = "Pantanal@33"; // Senha da rede WI-FI que deseja se conectar
+const char* SSID = ""; // SSID / nome da rede WI-FI que deseja se conectar
+const char* PASSWORD = ""; // Senha da rede WI-FI que deseja se conectar
 
 // MQTT
 const char* BROKER_MQTT = "broker.emqx.io"; //URL do broker MQTT que se deseja utilizar
@@ -43,6 +43,9 @@ bool statusAnt = 0;
 void initSerial() // Inicializa comunicação serial com baudrate 115200
 {
   Serial.begin(115200);
+  Serial.setTimeout(2000);
+  while(!Serial) { }
+  Serial.println("Acordado...");
 }
 
 void reconectWiFi()  //Reconecta-se ao WiFi
@@ -176,69 +179,35 @@ void publicaComando()
 
     //Publicando no MQTT
     Serial.println("Fazendo a publicacao...");
-    MQTT.publish(TOPICO_SUBSCRIBE,"L");
+    MQTT.publish(TOPICO_PUBLISH,"L");
     Serial.println("L enviado...");
 
 }
 
-#include "ESP8266WiFi.h"
-#include "gpio.h"
-extern "C" {
-#include "user_interface.h"
-  uint16 readvdd33(void);
-  bool wifi_set_sleep_type(sleep_type_t);
-  sleep_type_t wifi_get_sleep_type(void);
-}
-bool sleep = false;
 
 void setup() {
-
-  InitInput();
+  delay(1000);
   initSerial();
-  initWiFi();
-  initMQTT();
-
-  VerificaConexoesWiFIEMQTT(); // Garante funcionamento das conexões WiFi e ao broker MQTT
-
-  delay(100);
-  MQTT.loop();
-}
-
-void goToLightSleep()
-{
+  InitInput();
   
-  if (!sleep)
-  {
-    Serial.println("switching off Wifi Modem and CPU");
-    //stop any clients
-    //thisclient.stop();
-    delay(1000);
-    wifi_set_sleep_type(LIGHT_SLEEP_T);
-    WiFi.disconnect();
-    WiFi.mode(WIFI_OFF);
-    // how do we call this: 
-    gpio_pin_wakeup_enable(GPIO_ID_PIN(pino),GPIO_PIN_INTR_NEGEDGE);
-    wifi_fpm_open();
-    wifi_fpm_do_sleep(26843455);
-    if(WiFi.forceSleepBegin(26843455)) sleep = true;
-    Serial.println("WIFI DESLIGADO");
+  if(digitalRead(pino) == LOW){
+    // Se o botão estiver pressionado, vai fazer o que tem que fazer
+    initWiFi();
+    initMQTT();
+
+    VerificaConexoesWiFIEMQTT();
+  
+    delay(100);
+    
+    MQTT.loop();
+    publicaComando();
   }
+  
+  Serial.println("Entrando no sono por 7 segundos...");
+  delay(500);
+  ESP.deepSleep(7000000); // Dorme por 7 segundos, checa a condição, volta a dormir
 }
 
 void loop() {
-  bool statusAtual = digitalRead(pino);
-  //if(statusAtual != statusAnt)
-  if(digitalRead(pino) == LOW)
-  {
-    initWiFi();
-    initMQTT();
-    publicaComando();
-    Serial.println("fim do if");
-    sleep = false;
-    //statusAnt = statusAtual;
-  }
-  goToLightSleep();
-  delay(1000);
-  Serial.println("FIM DO LOOP");
-  
+
 }
